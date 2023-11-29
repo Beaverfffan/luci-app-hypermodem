@@ -120,3 +120,36 @@ stop_service()
 {
 	killall quectel-CM >/dev/null 2>&1
 }
+
+auto_reconnect() {
+    local check_interval=35  # 检查间隔，单位秒
+    local ip_addresses=("119.29.29.29" "223.5.5.5" "1.2.4.8")  # 需要检测的IP列表
+    local interface="wwan5g"  # 指定要用来ping的接口
+
+    while true; do
+        for ip in "${ip_addresses[@]}"; do
+            if ping -I "$interface" -c 1 -w 5 "$ip" > /dev/null 2>&1; then
+                echo "网络通过 $ip 连接正常"
+                break 2  # 跳出整个循环
+            fi
+        done
+
+        modem_reset  # 调用重置网络连接的函数
+        sleep "$check_interval"  # 等待一定时间后再次检测
+    done
+}
+
+# 定义重置网络连接的函数
+modem_reset() {
+    echo "正在停止所有 quectel-CM 进程..."
+    killall quectel-CM >/dev/null 2>&1
+    sleep 1  # 等待几秒确保进程已经完全终止
+
+    echo "正在停止 hypermodem 服务..."
+    /etc/init.d/hypermodem stop
+    sleep 1  # 等待几秒确保服务已经完全停止
+
+    echo "正在启动 hypermodem 服务..."
+    /etc/init.d/hypermodem start
+    echo "hypermodem 服务重启完毕。"
+}
